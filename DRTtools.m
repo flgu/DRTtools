@@ -102,9 +102,9 @@ function import_button_Callback(hObject, eventdata, handles)
 
     startingFolder = 'C:\*';
     if ~exist(startingFolder, 'dir')
-%       if that folder doesn't exist, just start in the current folder.
+    % if that folder doesn't exist, just start in the current folder.
         startingFolder = pwd;
-    end
+    end % if
 
     [baseFileName, folder] = uigetfile({ '*.mat; *.txt; *.csv*','Data files (*.mat, *.txt,*.csv)'}, 'Select a file');
 
@@ -113,10 +113,13 @@ function import_button_Callback(hObject, eventdata, handles)
     [folder,baseFileName,ext] = fileparts(fullFileName);
 
     if ~baseFileName
-%       User clicked the Cancel button.
+    % User clicked the Cancel button.
         return;
-    end
+    end % end if
 
+    T = evalin('base','whos')
+
+    % Cases environment for different data formats of the imported data
     switch ext
         case '.mat' % User selects Mat files.
             storedStructure = load(fullFileName);
@@ -154,21 +157,21 @@ function import_button_Callback(hObject, eventdata, handles)
             handles.data_exist = false;
     end
 
-%   find incorrect rows with zero frequency
+    % find incorrect rows with zero frequency
     index = find(A(:,1)==0); 
     A(index,:)=[];
     
-%   flip freq, Z_prime and Z_double_prime so that data are in the desceding 
-%   order of freq 
+    % flip freq, Z_prime and Z_double_prime so that data are in the desceding 
+    % order of freq 
     if A(1,1) < A(end,1)
        A = fliplr(A')';
-    end
+    end % if
     
     handles.freq = A(:,1);
     handles.Z_prime_mat = A(:,2);
     handles.Z_double_prime_mat = A(:,3);
     
-%   save original freq, Z_prime and Z_double_prime
+    % save original freq, Z_prime and Z_double_prime
     handles.freq_0 = handles.freq;
     handles.Z_prime_mat_0 = handles.Z_prime_mat;
     handles.Z_double_prime_mat_0 = handles.Z_double_prime_mat;
@@ -178,8 +181,7 @@ function import_button_Callback(hObject, eventdata, handles)
     handles.method_tag = 'none';
     
     %perphap for map array to gamma
-
-    
+   
     handles = inductance_Callback(hObject, eventdata, handles);
     EIS_data_Callback(hObject, eventdata, handles)
 
