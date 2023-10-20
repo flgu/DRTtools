@@ -157,28 +157,9 @@ function import_button_Callback(hObject, eventdata, handles)
             handles.data_exist = false;
     end
 
-    % find incorrect rows with zero frequency
-    index = find(A(:,1)==0); 
-    A(index,:)=[];
-    
-    % flip freq, Z_prime and Z_double_prime so that data are in the desceding 
-    % order of freq 
-    if A(1,1) < A(end,1)
-       A = fliplr(A')';
-    end % if
-    
-    handles.freq = A(:,1);
-    handles.Z_prime_mat = A(:,2);
-    handles.Z_double_prime_mat = A(:,3);
-    
-    % save original freq, Z_prime and Z_double_prime
-    handles.freq_0 = handles.freq;
-    handles.Z_prime_mat_0 = handles.Z_prime_mat;
-    handles.Z_double_prime_mat_0 = handles.Z_double_prime_mat;
-    
-    handles.Z_exp = handles.Z_prime_mat(:)+ 1i*handles.Z_double_prime_mat(:);
-    
-    handles.method_tag = 'none';
+    % 20-10-2023 refactored to prepare_A function
+    handles = prepare_A(A, handles);
+    % refactoring tested - pass
     
     %perphap for map array to gamma
    
@@ -317,32 +298,18 @@ function handles = regularization_button_Callback(hObject, eventdata, handles)
 
     set(handles.running_signal, 'Visible', 'on');
 
-%   bounds ridge regression
-    handles.lb = zeros(numel(handles.freq)+2,1);
-    handles.ub = Inf*ones(numel(handles.freq)+2,1);
-    handles.x_0 = ones(size(handles.lb));
-    
-    handles.options = optimset('algorithm','interior-point-convex','Display','off','TolFun',1e-15,'TolX',1e-10,'MaxFunEvals', 1E5);
+    % 20-10-2023 Refactored
+    handles = ridge_regression(handles)
 
-    handles.b_re = real(handles.Z_exp);
-    handles.b_im = imag(handles.Z_exp);
-
-%   compute epsilon
-    handles.epsilon = compute_epsilon(handles.freq, handles.coeff, handles.rbf_type, handles.shape_control);
-
-%   calculate the A_matrix
-    handles.A_re = assemble_A_re(handles.freq, handles.epsilon, handles.rbf_type);
-    handles.A_im = assemble_A_im(handles.freq, handles.epsilon, handles.rbf_type);
-
-%   adding the resistence column to the A_re_matrix
+    %   adding the resistence column to the A_re_matrix
     handles.A_re(:,2) = 1;
-    
-%   adding the inductance column to the A_im_matrix if necessary
+
+    %   adding the inductance column to the A_im_matrix if necessary
     if  get(handles.inductance,'Value')==2
         handles.A_im(:,1) = 2*pi*(handles.freq(:));
     end
-    
-%   calculate the M_matrix
+
+    %   calculate the M_matrix
     switch handles.der_used
         case '1st-order'
             handles.M = assemble_M_1(handles.freq, handles.epsilon, handles.rbf_type);
@@ -350,7 +317,7 @@ function handles = regularization_button_Callback(hObject, eventdata, handles)
             handles.M = assemble_M_2(handles.freq, handles.epsilon, handles.rbf_type);
     end
 
-%   Running ridge regression
+    %   Running ridge regression
     switch handles.data_used
         case 'Combined Re-Im Data'
             [H_combined,f_combined] = quad_format_combined(handles.A_re, handles.A_im, handles.b_re, handles.b_im, handles.M, handles.lambda);
@@ -403,12 +370,13 @@ function handles = regularization_button_Callback(hObject, eventdata, handles)
             mu_numerator = handles.A_re'*inv_V*handles.b_re;
 
     end
-    
+
     warning('off')
     handles.Sigma_inv = (Sigma_inv+Sigma_inv')/2;
     handles.mu = handles.Sigma_inv\mu_numerator; % linsolve
     warning('on')
     % map x to gamma
+
     [handles.gamma_ridge_fine,handles.freq_fine] = map_array_to_gamma(handles.freq_fine, handles.freq, handles.x_ridge(3:end), handles.epsilon, handles.rbf_type);
      handles.freq_fine = handles.freq_fine';
 %   method_tag: 'none': havnt done any computation, 'simple': simple DRT,
