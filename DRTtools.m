@@ -87,7 +87,21 @@ function import1_OpeningFcn(hObject, eventdata, handles, varargin)
 %               'credit': Bayesian run, 'BHT': Bayesian Hibert run
     handles.method_tag = 'none'; 
     handles.data_exist = false;
-    
+
+    % if this is a correct startup function, then here I try to correctly resize the UI-figure to match also a laptop screen
+    screenSize = get(groot, "ScreenSize")
+    screenWidth = screenSize(3)
+    screenHeight = screenSize(4)
+
+    left = screenWidth*0.1;
+    width = screenWidth*0.5;
+    bottom = screenHeight*0.1;
+    height = screenHeight*0.5;
+    drawnow;
+    hObject.Units = "pixel"
+    % hObject.Interactivity = "Scrollable"; this property is not available for this ui.figure type GUI
+    hObject.Position = [left, bottom, width, height];
+
 guidata(hObject, handles);
 
 
@@ -235,6 +249,7 @@ function handles = inductance_Callback(hObject, eventdata, handles)
     handles.taumin = floor(min(log10(1./handles.freq)))-0.5;
     handles.freq_fine = logspace(-handles.taumin, -handles.taumax, 10*numel(handles.freq));
     
+    % this EIS_data_Callback plots the EIS data on the figure
     EIS_data_Callback(hObject, eventdata, handles)
 
 guidata(hObject,handles) 
@@ -301,8 +316,7 @@ function handles = regularization_button_Callback(hObject, eventdata, handles)
     % 20-10-2023 Refactored
     handles = ridge_regression(handles)
 
-    %   adding the resistence column to the A_re_matrix
-    handles.A_re(:,2) = 1;
+    
 
     %   adding the inductance column to the A_im_matrix if necessary
     if  get(handles.inductance,'Value')==2
@@ -383,6 +397,7 @@ function handles = regularization_button_Callback(hObject, eventdata, handles)
 %               'credit': Bayesian run, 'BHT': Bayesian Hilbert run
     handles.method_tag = 'simple'; 
 
+    % this is for plotting
     handles = deconvolved_DRT_Callback(hObject, eventdata, handles);
     set(handles.running_signal, 'Visible', 'off');
 
@@ -960,7 +975,7 @@ function handles = deconvolved_DRT_Callback(hObject, eventdata, handles)
 %   Running ridge regression
 
     if strcmp(handles.method_tag,'none') % not plotting if user did not do any calculation 
-        return 
+        return
     end
     
     switch get(handles.DRT_type,'Value')
