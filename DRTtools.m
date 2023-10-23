@@ -314,10 +314,27 @@ function handles = regularization_button_Callback(hObject, eventdata, handles)
     set(handles.running_signal, 'Visible', 'on');
 
     % 20-10-2023 Refactored
-    handles = ridge_regression(handles)
+    %   bounds ridge regression
+    handles.lb = zeros(numel(handles.freq)+2,1);
+    handles.ub = Inf*ones(numel(handles.freq)+2,1);
+    handles.x_0 = ones(size(handles.lb));
 
+    handles.options = optimset('algorithm','interior-point-convex','Display','off','TolFun',1e-15,'TolX',1e-10,'MaxFunEvals', 1E5);
+
+    handles.b_re = real(handles.Z_exp);
+    handles.b_im = imag(handles.Z_exp);
     
+    
+    %   compute epsilon
+    handles.epsilon = compute_epsilon(handles.freq, handles.coeff, handles.rbf_type, handles.shape_control);
 
+    %   calculate the A_matrix
+    handles.A_re = assemble_A_re(handles.freq, handles.epsilon, handles.rbf_type);
+    handles.A_im = assemble_A_im(handles.freq, handles.epsilon, handles.rbf_type);
+
+    %   adding the resistence column to the A_re_matrix
+    handles.A_re(:,2) = 1;
+    
     %   adding the inductance column to the A_im_matrix if necessary
     if  get(handles.inductance,'Value')==2
         handles.A_im(:,1) = 2*pi*(handles.freq(:));
@@ -334,9 +351,15 @@ function handles = regularization_button_Callback(hObject, eventdata, handles)
     %   Running ridge regression
     switch handles.data_used
         case 'Combined Re-Im Data'
-            [H_combined,f_combined] = quad_format_combined(handles.A_re, handles.A_im, handles.b_re, handles.b_im, handles.M, handles.lambda);
+            handles.b_im
+            [H_combined,f_combined] = quad_format_combined(handles.A_re,...
+                                                            handles.A_im,...
+                                                            handles.b_re,...
+                                                            handles.b_im,...
+                                                            handles.M,...
+                                                            handles.lambda);        
             handles.x_ridge = quadprog(H_combined, f_combined, [], [], [], [], handles.lb, handles.ub, handles.x_0, handles.options);
-
+            
             %prepare for HMC sampler
             handles.mu_Z_re = handles.A_re*handles.x_ridge;
             handles.mu_Z_im = handles.A_im*handles.x_ridge;

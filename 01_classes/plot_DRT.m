@@ -14,9 +14,7 @@ function varargout = plot_DRT(x, y, options)
     
     hold(ax, "on")
     plt = plot(ax, x, y);
-    plt.LineWidth = options.LineWidth;
-    plt.LineStyle = options.LineStyle;
-    plt.DisplayName = options.DisplayName;
+    
     
     hold(ax, "off")
     

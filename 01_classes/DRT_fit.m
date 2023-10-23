@@ -32,6 +32,8 @@ classdef DRT_fit < handle
         gamma_ridge_fine
         mu_Z_re % recalculated EIS - Real based on DRT
         mu_Z_im % recalculated EIS - Imag based on DRT
+        res_re % residuals real part
+        res_im % residuals imag part
     end % props
 
     methods
@@ -68,6 +70,8 @@ classdef DRT_fit < handle
             this.gamma_ridge_fine = [];
             this.mu_Z_re = [];
             this.mu_Z_im = [];
+            this.res_re = [];
+            this.res_im = [];
         end % constructor
 
         function add_data(this, freq, realPart, imagPart)
@@ -154,19 +158,18 @@ classdef DRT_fit < handle
                                 'TolX',1e-10,...
                                 'MaxFunEvals', 1E5);
 
-            % warum hier nicht gleich die input real & imag benutzen?
-            handles.b_re = real(this.Z_exp);
-            handles.b_im = imag(this.Z_exp);
+            % warum hier nicht gleich die input real & imag benutzen? weil warhscheinlich durch inductance bearbeitet
+            b_re = real(this.Z_exp);
+            b_im = imag(this.Z_exp);
             
             %   compute epsilon
-            handles.epsilon = compute_epsilon(this.freq, this.coeff, this.rbf_type, this.shape_control);
+            epsilon = this.compute_epsilon(this.freq, this.coeff, this.rbf_type, this.shape_control);
 
             %   calculate the A_matrix
-            handles.A_re = assemble_A_re(this.freq, handles.epsilon, this.rbf_type);
-            handles.A_im = assemble_A_im(this.freq, handles.epsilon, this.rbf_type);
+            % das muss noch als interne Methode implementiert werden
+            handles.A_re = assemble_A_re(this.freq, epsilon, this.rbf_type);
+            handles.A_im = assemble_A_im(this.freq, epsilon, this.rbf_type);
 
-            % up to here it works
-            % below here not tested!
             %   adding the resistence column to the A_re_matrix
             handles.A_re(:,2) = 1;
 
@@ -178,9 +181,9 @@ classdef DRT_fit < handle
             %   calculate the M_matrix
             switch this.der_used
                 case '1st-order'
-                    handles.M = assemble_M_1(this.freq, handles.epsilon, this.rbf_type);
+                    M_mat = assemble_M_1(this.freq, epsilon, this.rbf_type);
                 case '2nd-order'
-                    handles.M = assemble_M_2(this.freq, handles.epsilon, this.rbf_type);
+                    M_mat = assemble_M_2(this.freq, epsilon, this.rbf_type);
             end
 
             %   Running ridge regression
@@ -188,10 +191,11 @@ classdef DRT_fit < handle
                 case 'Combined Re-Im Data'
                     [H_combined,f_combined] = quad_format_combined(handles.A_re,...
                                                                     handles.A_im,...
-                                                                    handles.b_re,...
-                                                                    handles.b_im,...
-                                                                    handles.M,...
-                                                                    this.lambda);
+                                                                    b_re,...
+                                                                    b_im,...
+                                                                    M_mat,... % check
+                                                                    this.lambda); % check
+                                                                                                                                                                            
                     handles.x_ridge = quadprog(H_combined,...
                                                 f_combined,...
                                                 [], [], [], [],...
@@ -200,24 +204,26 @@ classdef DRT_fit < handle
                                                 x_0,...
                                                 options);
 
+                    % hier kommt etwas anderes raus, als in der app!!!!! Size und format ist dasselbe aber die werte sind anders
+                    
                     %prepare for HMC sampler
                     this.mu_Z_re = handles.A_re*handles.x_ridge;
                     this.mu_Z_im = handles.A_im*handles.x_ridge;
 
-                    handles.res_re = this.mu_Z_re-handles.b_re;
-                    handles.res_im = this.mu_Z_im-handles.b_im;
+                    this.res_re = this.mu_Z_re-b_re;
+                    this.res_im = this.mu_Z_im-b_im;
 
-                    sigma_re_im = std([handles.res_re;handles.res_im]);
+                    sigma_re_im = std([this.res_re;this.res_im]);
 
                     inv_V = 1/sigma_re_im^2*eye(numel(this.freq));
 
-                    Sigma_inv = (handles.A_re'*inv_V*handles.A_re) + (handles.A_im'*inv_V*handles.A_im) + (this.lambda/sigma_re_im^2)*handles.M;
-                    mu_numerator = handles.A_re'*inv_V*handles.b_re + handles.A_im'*inv_V*handles.b_im;
+                    Sigma_inv = (handles.A_re'*inv_V*handles.A_re) + (handles.A_im'*inv_V*handles.A_im) + (this.lambda/sigma_re_im^2)*M_mat;
+                    mu_numerator = handles.A_re'*inv_V*b_re + handles.A_im'*inv_V*b_im;
                     
                 case 'Im Data'
                     [H_im,f_im] = quad_format(handles.A_im,...
                                             handles.b_im,...
-                                            handles.M,...
+                                            M_mat,...
                                             this.lambda);
                     handles.x_ridge = quadprog(H_im,...
                                                 f_im,...
@@ -231,18 +237,18 @@ classdef DRT_fit < handle
                     this.mu_Z_re = handles.A_re*handles.x_ridge;
                     this.mu_Z_im = handles.A_im*handles.x_ridge;
 
-                    handles.res_im = handles.mu_Z_im-handles.b_im;
+                    this.res_im = this.mu_Z_im-b_im;
                     sigma_re_im = std(handles.res_im);
 
                     inv_V = 1/sigma_re_im^2*eye(numel(this.freq));
 
-                    Sigma_inv = (handles.A_im'*inv_V*handles.A_im) + (handles.lambda/sigma_re_im^2)*handles.M;
-                    mu_numerator = handles.A_im'*inv_V*handles.b_im;
+                    Sigma_inv = (handles.A_im'*inv_V*handles.A_im) + (this.lambda/sigma_re_im^2)*M_mat;
+                    mu_numerator = handles.A_im'*inv_V*b_im;
 
                 case 'Re Data'
                     [H_re,f_re] = quad_format(handles.A_re,...
-                                            handles.b_re,...
-                                            handles.M,...
+                                            b_re,...
+                                            M_mat,...
                                             this.lambda);
                     handles.x_ridge = quadprog(H_re,...
                                                 f_re,...
@@ -256,13 +262,13 @@ classdef DRT_fit < handle
                     this.mu_Z_re = handles.A_re*handles.x_ridge;
                     this.mu_Z_im = handles.A_im*handles.x_ridge;
 
-                    handles.res_re = handles.mu_Z_re-handles.b_re;
-                    sigma_re_im = std(handles.res_re);
+                    this.res_re = M_matu_Z_re-b_re;
+                    sigma_re_im = std(this.res_re);
 
                     inv_V = 1/sigma_re_im^2*eye(numel(this.freq));
 
-                    Sigma_inv = (handles.A_re'*inv_V*handles.A_re) + (this.lambda/sigma_re_im^2)*handles.M;            
-                    mu_numerator = handles.A_re'*inv_V*handles.b_re;
+                    Sigma_inv = (handles.A_re'*inv_V*handles.A_re) + (this.lambda/sigma_re_im^2)*M_mat;            
+                    mu_numerator = handles.A_re'*inv_V*b_re;
             end % switch
 
             warning('off')
@@ -274,11 +280,11 @@ classdef DRT_fit < handle
             [this.gamma_ridge_fine,this.freq_fine] = map_array_to_gamma(this.freq_fine,...
                                                                             this.freq,...
                                                                             handles.x_ridge(3:end),...
-                                                                            handles.epsilon,...
+                                                                            epsilon,...
                                                                             this.rbf_type);
             this.freq_fine = this.freq_fine';
-        %   method_tag: 'none': havnt done any computation, 'simple': simple DRT,
-        %               'credit': Bayesian run, 'BHT': Bayesian Hilbert run
+            %   method_tag: 'none': havnt done any computation, 'simple': simple DRT,
+            %               'credit': Bayesian run, 'BHT': Bayesian Hilbert run
             this.method_tag = 'simple';
 
             % deconvolved DRT callback displays DRT vs tau/f etc
@@ -450,6 +456,133 @@ classdef DRT_fit < handle
             varargout{2} = fig;
         end % fun def
 
+        function Residual_Re_plot(this)
+            if ~this.data_exist || strcmp(this.method_tag, 'none') || strcmp(this.data_used,'Im Data')
+                return
+            end
+            fig = figure();
+            ax_Res_Re = axes(fig);
+        
+            if strcmp(this.method_tag,'BHT') 
+            %       Residual w.r.t. mu_Z_H_re
+                ciplot(-3*handles.band_re_agm, 3*handles.band_re_agm, handles.freq, 0.7*[1 1 1]);
+                hold on
+                plot(handles.freq,handles.res_H_re,'or', 'MarkerSize', 4, 'MarkerFaceColor', 'r');
+                ylabel(handles.axes_panel_drt,'$R_{\infty}+Z^{\prime}_{\rm H}-Z^{\prime}_{\rm exp}$','Interpreter', 'Latex','Fontsize',24);
+                
+                y_max = max(3*handles.band_re_agm);
+        
+            else
+                plt = plot(ax_Res_Re, this.freq, this.res_re,'or', 'MarkerSize', 4, 'MarkerFaceColor', 'r');
+                ylabel(ax_Res_Re,'$Z^{\prime}_{\rm DRT}-Z^{\prime}_{\rm exp}$',...
+                'Interpreter', 'Latex',...
+                'Fontsize',24);
+                
+                y_max = max(abs(this.res_re));
+                
+            end
+        
+            xlabel(ax_Res_Re,'$f$/Hz', 'Interpreter', 'Latex','Fontsize',24);
+            set(ax_Res_Re,'xscale','log',...
+            'xlim',[min(this.freq), max(this.freq)],...
+            'Fontsize',20,...
+            'xtick',10.^[-10:2:10],...
+            'TickLabelInterpreter','latex')
+            %   Ensuring symmetric y_axis
+            ylim([-1.1*y_max 1.1*y_max])
+
+        end % fun def
+
+        function Residual_Im_plot(this)
+
+            if ~this.data_exist || strcmp(this.method_tag, 'none') || strcmp(this.data_used,'Re Data') 
+                return
+            end
+            fig = figure();
+            ax_Res_Im = axes(fig);
+        
+            if strcmp(this.method_tag,'BHT') 
+                % Residual w.r.t. mu_Z_H_im
+                ciplot(-3*handles.band_im_agm,3*handles.band_im_agm, handles.freq, 0.7*[1 1 1]);
+                hold on
+                plot(handles.freq,handles.res_H_im,'or', 'MarkerSize', 4, 'MarkerFaceColor', 'r');
+                ylabel(handles.axes_panel_drt,'$\omega L_0+Z^{\prime\prime}_{\rm H}-Z^{\prime\prime}_{\rm exp}$','Interpreter', 'Latex','Fontsize',24);
+                
+                y_max = max(3*handles.band_im_agm);
+        
+            else
+                plot(ax_Res_Im, this.freq, this.res_im,'or', 'MarkerSize', 4, 'MarkerFaceColor', 'r');
+                hold on
+                ylabel(ax_Res_Im,'$Z^{\prime\prime}_{\rm DRT}-Z^{\prime\prime}_{\rm exp}$',...
+                'Interpreter', 'Latex',...
+                'Fontsize',24);
+        
+                y_max = max(abs(this.res_im));
+                
+            end
+        
+            xlabel(ax_Res_Im,'$f$/Hz',...
+             'Interpreter', 'Latex',...
+             'Fontsize',24);
+        
+            set(ax_Res_Im,'xscale','log',...
+            'xlim',[min(this.freq), max(this.freq)],...
+            'Fontsize',20,...
+            'xtick',10.^[-10:2:10],...
+            'TickLabelInterpreter','latex')
+        %   Ensuring symmetric y_axis
+            ylim([-1.1*y_max 1.1*y_max])
+
+        end % fun def
 
     end % methods
+
+    methods (Static)
+        function out_val = compute_epsilon(freq, coeff, rbf_type, shape_control)
+    
+            %   this function is used to compute epsilon, i.e., the shape factor of
+            %   the rbf used for discretization. user can directly set the shape factor
+            %   by selecting 'Shape Factor' for the shape_control. alternatively, 
+            %   when 'FWHM Coefficient' is selected, the shape factor is such that 
+            %   the full width half maximum (FWHM) of the rbf equals to the average 
+            %   relaxation time spacing in log space over coeff, i.e., FWHM = delta(ln tau)/coeff
+            
+                switch rbf_type
+                    case 'Gaussian'
+                        rbf_gaussian_4_FWHM = @(x) exp(-(x).^2)-1/2;
+                        FWHM_coeff = 2*fzero(@(x) rbf_gaussian_4_FWHM(x), 1);
+                    case 'C2 Matern'
+                        rbf_C2_matern_4_FWHM = @(x) exp(-abs(x)).*(1+abs(x))-1/2;
+                        FWHM_coeff = 2*fzero(@(x) rbf_C2_matern_4_FWHM(x), 1);
+                    case 'C4 Matern'
+                        rbf_C4_matern_4_FWHM = @(x) 1/3*exp(-abs(x)).*(3+3*abs(x)+abs(x).^2)-1/2;
+                        FWHM_coeff = 2*fzero(@(x) rbf_C4_matern_4_FWHM(x), 1);
+                    case 'C6 Matern'
+                        rbf_C6_matern_4_FWHM = @(x) 1/15*exp(-abs(x)).*(15+15*abs(x)+6*abs(x).^2+abs(x).^3)-1/2;
+                        FWHM_coeff = 2*fzero(@(x) rbf_C6_matern_4_FWHM(x), 1);
+                    case 'Inverse quadratic'
+                        rbf_inverse_quadratic_4_FWHM = @(x)  1./(1+(x).^2)-1/2;
+                        FWHM_coeff =  2*fzero(@(x) rbf_inverse_quadratic_4_FWHM(x), 1);
+                    case 'Inverse quadric'
+                        rbf_inverse_quadric_4_FWHM = @(x)  1./sqrt(1+(x).^2)-1/2;
+                        FWHM_coeff = 2*fzero(@(x) rbf_inverse_quadric_4_FWHM(x), 1);
+                    case 'Cauchy'
+                        rbf_cauchy_4_FWHM = @(x)  1./(1+abs(x))-1/2;
+                        FWHM_coeff = 2*fzero(@(x) rbf_cauchy_4_FWHM(x) ,1);
+                    case 'Piecewise linear'
+                        FWHM_coeff = 0 ;
+                end
+            
+                switch shape_control
+                    case 'FWHM Coefficient'
+                        delta = mean(diff(log(1./freq)));
+                        out_val  = coeff*FWHM_coeff/delta;
+                    case 'Shape Factor'
+                        out_val = coeff;
+                end
+            
+            end
+
+    end % static methods
+
 end % class def
