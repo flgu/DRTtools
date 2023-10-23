@@ -285,7 +285,7 @@ classdef DRT_fit < handle
             
         end % fun def
 
-        function Gamma_Tau_plot(this)
+        function varargout = Gamma_Tau_plot(this)
 
             fig = figure();
             ax_DRT = axes(fig);
@@ -348,18 +348,40 @@ classdef DRT_fit < handle
                 'Fontsize',20,...
                 'xtick',10.^[-10:2:10],...
                 'TickLabelInterpreter','latex')
+
+            grid(ax_DRT, "on")
+            grid(ax_DRT, "minor")
             
+            % add optional outputs
+            varargout{1} = ax_DRT;
+            varargout{2} = fig;
         end % fun def
 
-        function Gamma_Freq_plot(this)
+        function varargout = Gamma_Freq_plot(this, options)
             %   Running ridge regression
             
+            arguments
+                this
+                options.Color = "black";
+                options.LineWidth double = 3;
+                options.LineStyle string = "-";
+                options.DisplayName string = "DRT Spectrum";
+            end % args
+
             fig = figure();
+
+            fig_width = 1280; % px
+            fig_height = 720; % px
+
+            % populate properties
+            fig.Position = [100,100,fig_width, fig_height];
+
+
             ax_DRT = axes(fig);
                 
             switch this.method_tag
                 case 'simple'
-                    plot(ax_DRT, this.freq_fine, this.gamma_ridge_fine, '-k', 'LineWidth', 3);
+                    plt = plot(ax_DRT, this.freq_fine, this.gamma_ridge_fine );
         
                     y_min = 0; 
                     y_max = max(this.gamma_ridge_fine);
@@ -402,7 +424,12 @@ classdef DRT_fit < handle
                     y_max = max(handles.gamma_ridge_fine);
                     
             end
-        
+            
+            plt.LineWidth = options.LineWidth;
+            plt.LineStyle = options.LineStyle;
+            plt.DisplayName = options.DisplayName;
+            plt.Color = options.Color;
+
             %   adding labels
             xlabel(ax_DRT,'$f$/Hz', 'Interpreter', 'Latex','Fontsize',24)
             ylabel(ax_DRT,'$\gamma(\ln f)/\Omega$','Interpreter', 'Latex','Fontsize',24);
@@ -415,6 +442,12 @@ classdef DRT_fit < handle
             'TickLabelInterpreter','latex')
             hold off
 
+            grid(ax_DRT, "on")
+            grid(ax_DRT, "minor")
+            
+            % add optional outputs
+            varargout{1} = ax_DRT;
+            varargout{2} = fig;
         end % fun def
 
 
