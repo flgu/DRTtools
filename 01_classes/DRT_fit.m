@@ -456,7 +456,7 @@ classdef DRT_fit < handle
             varargout{2} = fig;
         end % fun def
 
-        function Residual_Re_plot(this)
+        function varargout = Residual_Re_plot(this)
             if ~this.data_exist || strcmp(this.method_tag, 'none') || strcmp(this.data_used,'Im Data')
                 return
             end
@@ -491,9 +491,12 @@ classdef DRT_fit < handle
             %   Ensuring symmetric y_axis
             ylim([-1.1*y_max 1.1*y_max])
 
+            % add optional outputs
+            varargout{1} = ax_Res_Re;
+            varargout{2} = fig;
         end % fun def
 
-        function Residual_Im_plot(this)
+        function varargout = Residual_Im_plot(this)
 
             if ~this.data_exist || strcmp(this.method_tag, 'none') || strcmp(this.data_used,'Re Data') 
                 return
@@ -530,9 +533,70 @@ classdef DRT_fit < handle
             'Fontsize',20,...
             'xtick',10.^[-10:2:10],...
             'TickLabelInterpreter','latex')
-        %   Ensuring symmetric y_axis
+            %   Ensuring symmetric y_axis
             ylim([-1.1*y_max 1.1*y_max])
 
+            % add optional outputs
+            varargout{1} = ax_Res_Im;
+            varargout{2} = fig;
+        end % fun def
+        
+        function peak_struct = peak_data(this, low_freq, high_freq)
+            % create a struct with all peak information
+            
+            % save frequency range
+            peak_struct.low_freq = low_freq;
+            peak_struct.high_freq = high_freq;
+            
+            % mark peak 1 in DRT
+            peak_struct.idx_DRT = (this.freq_fine >= peak_struct.low_freq) & (this.freq_fine <= peak_struct.high_freq);
+            
+            % mark frequency range in EIS spectrum
+            peak_struct.idx_EIS = find((this.freq_0>=peak_struct.low_freq) & (this.freq_0<=peak_struct.high_freq));
+        end % fun def
+
+        function varargout = apply_patch(this, ax, type, low_freq, high_freq, options)
+            arguments
+                this
+                ax
+                type
+                low_freq
+                high_freq
+                options.Color = "r";
+                options.FaceAlpha double = 0.5;
+                options.DisplayName string = "";
+            end
+            
+            peak_strct = peak_data(this, low_freq, high_freq);
+
+            switch type
+                case "DRT"
+                    x = this.freq_fine(peak_strct.idx_DRT);
+                    y = this.gamma_ridge_fine(peak_strct.idx_DRT);
+
+                case "Nyquist"
+                    x = [this.mu_Z_re(peak_strct.idx_EIS(1)); ...
+                        this.mu_Z_re(peak_strct.idx_EIS); ...
+                            this.mu_Z_re(peak_strct.idx_EIS(end))];
+                    y = [0;-this.mu_Z_im(peak_strct.idx_EIS);0];
+
+            end % switch
+                        
+            % reshape data
+            x = reshape(x, 1, numel(x));
+            y = reshape(y, 1, numel(y));
+        
+            ptch = patch(ax, ...
+                [x, fliplr(x)], ...
+                [y, zeros(size(x))], ...
+                options.Color, ...
+                FaceAlpha=options.FaceAlpha);
+
+            if ~strcmp(options.DisplayName, "")
+                ptch.DisplayName = options.DisplayName;
+            end % if
+
+            varargout{1} = peak_strct;
         end % fun def
 
     end % methods
