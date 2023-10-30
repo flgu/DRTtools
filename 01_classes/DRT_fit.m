@@ -574,6 +574,18 @@ classdef DRT_fit < handle
                     x = this.freq_fine(peak_strct.idx_DRT);
                     y = this.gamma_ridge_fine(peak_strct.idx_DRT);
 
+                    % sort in ascending order for better integration
+                    [x_sorted, idx] = sort(x);
+                    y_sorted = y(idx);
+
+                    % integrate the data between low and high frequency in order to calculate the resistance of this frequency region
+                    peak_strct.R_peak = trapz(log(x_sorted),y_sorted);
+
+                    % overall polarization
+                    [f_sorted, idx] = sort(this.freq_fine);
+                    gamma_sorted = this.gamma_ridge_fine(idx);
+                    peak_strct.R_pol = trapz(log(f_sorted), gamma_sorted);
+                    peak_strct.R_percent = peak_strct.R_peak / peak_strct.R_pol * 100;
                 case "Nyquist"
                     x = [this.mu_Z_re(peak_strct.idx_EIS(1)); ...
                         this.mu_Z_re(peak_strct.idx_EIS); ...
