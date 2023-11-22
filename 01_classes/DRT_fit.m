@@ -565,6 +565,7 @@ classdef DRT_fit < handle
                 options.Color = "r";
                 options.FaceAlpha double = 0.5;
                 options.DisplayName string = "";
+                options.Plotting string = "True";
             end
             
             peak_strct = peak_data(this, low_freq, high_freq);
@@ -597,13 +598,14 @@ classdef DRT_fit < handle
             % reshape data
             x = reshape(x, 1, numel(x));
             y = reshape(y, 1, numel(y));
-        
-            ptch = patch(ax, ...
-                [x, fliplr(x)], ...
-                [y, zeros(size(x))], ...
-                options.Color, ...
-                FaceAlpha=options.FaceAlpha);
-
+            
+            if options.Plotting == "True"
+                ptch = patch(ax, ...
+                    [x, fliplr(x)], ...
+                    [y, zeros(size(x))], ...
+                    options.Color, ...
+                    FaceAlpha=options.FaceAlpha);
+            end % if
             if ~strcmp(options.DisplayName, "")
                 ptch.DisplayName = options.DisplayName;
             end % if
