@@ -34,6 +34,7 @@ classdef DRT_fit < handle
         mu_Z_im % recalculated EIS - Imag based on DRT
         res_re % residuals real part
         res_im % residuals imag part
+        R0 % resistance
     end % props
 
     methods
@@ -46,6 +47,7 @@ classdef DRT_fit < handle
             this.coeff = 0.5;
             this.shape_control = 'FWHM Coefficient';
             this.der_used = '1st-order';    
+            this.R0 = [];
         %   method_tag: 'none': havnt done any computation, 'simple': simple DRT,
         %               'credit': Bayesian run, 'BHT': Bayesian Hibert run
             this.method_tag = 'none'; 
@@ -286,6 +288,9 @@ classdef DRT_fit < handle
             %   method_tag: 'none': havnt done any computation, 'simple': simple DRT,
             %               'credit': Bayesian run, 'BHT': Bayesian Hilbert run
             this.method_tag = 'simple';
+            
+            % save R0 resistance from quadprogramming result
+            this.R0 = handles.x_ridge(2);
 
             % deconvolved DRT callback displays DRT vs tau/f etc
             
