@@ -377,9 +377,14 @@ classdef DRT_fit < handle
                 options.LineWidth double = 3;
                 options.LineStyle string = "-";
                 options.DisplayName string = "DRT Spectrum";
+                options.fig = [];
             end % args
 
-            fig = figure();
+            if isempty(options.fig)
+                fig = figure();
+            else
+                fig = options.fig;
+            end % if
 
             fig_width = 1280; % px
             fig_height = 720; % px
