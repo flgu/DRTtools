@@ -35,6 +35,10 @@ classdef DRT_fit < handle
         res_re % residuals real part
         res_im % residuals imag part
         R0 % resistance
+
+        % default figure properties
+        fig_width
+        fig_height
     end % props
 
     methods
@@ -74,6 +78,10 @@ classdef DRT_fit < handle
             this.mu_Z_im = [];
             this.res_re = [];
             this.res_im = [];
+
+            % default figure properties
+            this.fig_width = 1280; % px
+            this.fig_height = 720; % px
         end % constructor
 
         function add_data(this, freq, realPart, imagPart)
@@ -386,12 +394,8 @@ classdef DRT_fit < handle
                 fig = options.fig;
             end % if
 
-            fig_width = 1280; % px
-            fig_height = 720; % px
-
             % populate properties
-            fig.Position = [100,100,fig_width, fig_height];
-
+            fig.Position = [100,100,this.fig_width, this.fig_height];
 
             ax_DRT = axes(fig);
                 
@@ -466,11 +470,21 @@ classdef DRT_fit < handle
             varargout{2} = fig;
         end % fun def
 
-        function varargout = Residual_Re_plot(this)
+        function varargout = Residual_Re_plot(this, options)
+            arguments
+                this
+                options.MarkerFaceColor = "red";
+                options.size = 40;
+                options.LineWidth double = 3;
+                options.LineStyle string = "-";
+                options.DisplayName string = "Residuals Re";
+            end % args
+
             if ~this.data_exist || strcmp(this.method_tag, 'none') || strcmp(this.data_used,'Im Data')
                 return
             end
             fig = figure();
+            fig.Position = [100,100,this.fig_width, this.fig_height];
             ax_Res_Re = axes(fig);
         
             if strcmp(this.method_tag,'BHT') 
@@ -483,7 +497,12 @@ classdef DRT_fit < handle
                 y_max = max(3*handles.band_re_agm);
         
             else
-                plt = plot(ax_Res_Re, this.freq, this.res_re,'or', 'MarkerSize', 4, 'MarkerFaceColor', 'r');
+                % plt = plot(ax_Res_Re, this.freq, this.res_re,'or', 'MarkerSize', 4, 'MarkerFaceColor', 'r');
+
+                plt = scatter(ax_Res_Re, this.freq, this.res_re, options.size, 'filled');
+                plt.MarkerFaceColor = options.MarkerFaceColor;
+                plt.DisplayName = options.DisplayName;
+
                 ylabel(ax_Res_Re,'$Z^{\prime}_{\rm DRT}-Z^{\prime}_{\rm exp}$',...
                 'Interpreter', 'Latex',...
                 'Fontsize',24);
@@ -501,17 +520,31 @@ classdef DRT_fit < handle
             %   Ensuring symmetric y_axis
             ylim([-1.1*y_max 1.1*y_max])
 
+            % turn grid on
+            grid(ax_Res_Re, "on")
+            grid(ax_Res_Re, "minor")
+            
             % add optional outputs
             varargout{1} = ax_Res_Re;
             varargout{2} = fig;
         end % fun def
 
-        function varargout = Residual_Im_plot(this)
+        function varargout = Residual_Im_plot(this, options)
+
+            arguments
+                this
+                options.MarkerFaceColor = "red";
+                options.size = 40;
+                options.LineWidth double = 3;
+                options.LineStyle string = "-";
+                options.DisplayName string = "Residuals Re";
+            end % args
 
             if ~this.data_exist || strcmp(this.method_tag, 'none') || strcmp(this.data_used,'Re Data') 
                 return
             end
             fig = figure();
+            fig.Position = [100,100,this.fig_width, this.fig_height];
             ax_Res_Im = axes(fig);
         
             if strcmp(this.method_tag,'BHT') 
@@ -524,14 +557,18 @@ classdef DRT_fit < handle
                 y_max = max(3*handles.band_im_agm);
         
             else
-                plot(ax_Res_Im, this.freq, this.res_im,'or', 'MarkerSize', 4, 'MarkerFaceColor', 'r');
-                hold on
+                % plot(ax_Res_Im, this.freq, this.res_im,'or', 'MarkerSize', 4, 'MarkerFaceColor', 'r');
+                
+                plt = scatter(ax_Res_Im, this.freq, this.res_im, options.size, 'filled');
+                plt.MarkerFaceColor = options.MarkerFaceColor;
+                plt.DisplayName = options.DisplayName;
+
+                
                 ylabel(ax_Res_Im,'$Z^{\prime\prime}_{\rm DRT}-Z^{\prime\prime}_{\rm exp}$',...
                 'Interpreter', 'Latex',...
                 'Fontsize',24);
         
                 y_max = max(abs(this.res_im));
-                
             end
         
             xlabel(ax_Res_Im,'$f$/Hz',...
@@ -545,6 +582,10 @@ classdef DRT_fit < handle
             'TickLabelInterpreter','latex')
             %   Ensuring symmetric y_axis
             ylim([-1.1*y_max 1.1*y_max])
+            
+            % turn grid on
+            grid(ax_Res_Im, "on")
+            grid(ax_Res_Im, "minor")
 
             % add optional outputs
             varargout{1} = ax_Res_Im;
